@@ -2,21 +2,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { questions } from "../services/questions";
-import { getNextQuestion } from "../services/algorithm";
+import { getNextQuestion, MAX_ITEMS } from "../services/algorithm";
 import { db, auth } from "../firebase";
 import { addDoc, collection, Timestamp } from "firebase/firestore";
 
 export default function Test() {
   const [answers, setAnswers] = useState([]);
-  const [currentQuestion, setCurrentQuestion] = useState(questions[0]);
+  const [currentQuestion, setCurrentQuestion] = useState(
+    questions.length ? questions[Math.floor(Math.random() * questions.length)] : null
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  const TOTAL = MAX_ITEMS;
+
   const handleAnswer = async (value) => {
     if (!currentQuestion) return;
 
-    // 1) Añadimos la respuesta al array
+    // 1) Guardar la respuesta
     const answerObj = {
       id: currentQuestion.id,
       value,
@@ -26,36 +30,29 @@ export default function Test() {
     const newAnswers = [...answers, answerObj];
     setAnswers(newAnswers);
 
-    // 2) Calculamos la siguiente pregunta
+    // 2) Obtener próxima pregunta adaptativa
     const next = getNextQuestion(newAnswers);
     if (next) {
       setCurrentQuestion(next);
       return;
     }
 
-    // 3) Si no hay más preguntas, guardamos en Firestore
+    // 3) Finalizar: guardar respuestas y redirigir
     setSaving(true);
     setError(null);
-
-    console.log("🔐 Usuario:", auth.currentUser?.uid);
-    console.log("📨 Datos a guardar:", newAnswers);
-
     try {
       await addDoc(collection(db, "results"), {
         userId: auth.currentUser.uid,
         date: Timestamp.now(),
         answers: newAnswers,
       });
-      console.log("✅ Guardado exitoso");
       navigate("/dashboard");
     } catch (err) {
-      console.error("❌ Error guardando en Firestore:", err);
       setError(err.message);
       setSaving(false);
     }
   };
 
-  // Mientras se guarda, mostramos un feedback
   if (saving) {
     return (
       <div style={{ padding: 20 }}>
@@ -63,6 +60,10 @@ export default function Test() {
         {error && <p style={{ color: "red" }}>Error: {error}</p>}
       </div>
     );
+  }
+
+  if (!currentQuestion) {
+    return <p style={{ padding: 20 }}>No hay más preguntas.</p>;
   }
 
   return (
@@ -76,7 +77,7 @@ export default function Test() {
       </button>
       <button onClick={() => handleAnswer(false)}>No</button>
       <p>
-        Pregunta {answers.length + 1} de {questions.length}
+        Pregunta {answers.length + 1} de {TOTAL}
       </p>
       {error && <p style={{ color: "red" }}>Error: {error}</p>}
     </div>
