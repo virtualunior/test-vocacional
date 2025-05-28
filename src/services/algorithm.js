@@ -39,12 +39,26 @@ function calculateScores(answers) {
 /**
  * Determina la categoría dominante, con desempate por menor ocurrencia.
  */
+//function getDominantCategory(scores, normalized, counts) {
+  //const maxNorm = Math.max(...CATEGORIES.map(c => normalized[c]));
+  //const top = CATEGORIES.filter(c => normalized[c] === maxNorm);
+  //if (top.length === 1) return top[0];
+  //top.sort((a, b) => counts[a] - counts[b]);
+  //return top[0];
+//}
+
 function getDominantCategory(scores, normalized, counts) {
   const maxNorm = Math.max(...CATEGORIES.map(c => normalized[c]));
   const top = CATEGORIES.filter(c => normalized[c] === maxNorm);
+
   if (top.length === 1) return top[0];
-  top.sort((a, b) => counts[a] - counts[b]);
-  return top[0];
+
+  // Opción 1: Seleccionar aleatoriamente entre las categorías dominantes
+  return top[Math.floor(Math.random() * top.length)];
+
+  // Opción 2 (Si quieres priorizar la que YA ha tenido más preguntas, para solidificar su liderazgo):
+  // top.sort((a, b) => counts[b] - counts[a]); // Orden descendente por counts
+  // return top[0];
 }
 
 /**
