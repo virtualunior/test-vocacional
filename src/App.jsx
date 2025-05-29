@@ -1,66 +1,28 @@
 // src/App.jsx
-import { useState, useEffect } from 'react'; // Import useEffect
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Auth from './components/Auth';
+import Auth      from './components/Auth';
 import Dashboard from './pages/Dashboard';
-import Test from './pages/Test';
-import TestDetail from './pages/TestDetail';
-import { auth } from './firebase'; // Import auth from your firebase.js
+import Test      from './pages/Test';
+import TestDetail from './pages/TestDetail'
 
 export default function App() {
+  // Estado para saber si hay un usuario logueado
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // New loading state
 
-  // Use useEffect to listen for auth state changes
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setLoading(false); // Authentication state is determined, stop loading
-    });
-
-    // Cleanup the subscription when the component unmounts
-    return () => unsubscribe();
-  }, []); // Empty dependency array means this runs once on mount
-
-  // Display a loading indicator while Firebase initializes
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#db1f26] to-[#660915] text-white text-xl">
-        Cargando autenticación...
-      </div>
-    );
+  // Mientras no tengamos usuario, mostramos el componente de Auth
+  if (!user) {
+    return <Auth onUser={setUser} />;
   }
 
+  // Una vez logueado, habilitamos las rutas
   return (
     <Routes>
-      {/* Public route for authentication */}
-      {/* If user is logged in, redirect from /auth to /dashboard */}
-      <Route
-        path="/auth"
-        element={user ? <Navigate to="/dashboard" replace /> : <Auth onUser={setUser} />}
-      />
-
-      {/* Protected Routes */}
-      {/* If no user, redirect to /auth */}
-      <Route
-        path="/dashboard"
-        element={user ? <Dashboard /> : <Navigate to="/auth" replace />}
-      />
-      <Route
-        path="/dashboard/:id"
-        element={user ? <TestDetail /> : <Navigate to="/auth" replace />}
-      />
-      <Route
-        path="/test"
-        element={user ? <Test /> : <Navigate to="/auth" replace />}
-      />
-
-      {/* Default redirect for unmatched paths */}
-      {/* If a user is logged in, default to dashboard. Otherwise, default to auth. */}
-      <Route
-        path="*"
-        element={user ? <Navigate to="/dashboard" replace /> : <Navigate to="/auth" replace />}
-      />
+      <Route path="/dashboard"      element={<Dashboard />} />
+      <Route path="/dashboard/:id"  element={<TestDetail />} />
+      <Route path="/test" element={<Test />} />
+      {/* Redirigir a /dashboard por defecto */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

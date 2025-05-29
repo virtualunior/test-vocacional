@@ -4,9 +4,9 @@
 import { questions } from './questions';
 
 // Configuración del test
-export const MAX_QUESTIONS = 30;
-const EXPLORATION_PHASE_LENGTH = 10;       // 2 preguntas por categoría (5×2)
-const CATEGORIES = ['STEM', 'HUM', 'NAT', 'ART', 'SOC'];
+export const MAX_QUESTIONS = 40;
+const EXPLORATION_PHASE_LENGTH = 15;       // 3 preguntas por categoría (5×3)
+export const CATEGORIES = ['EXPLORADOR', 'HACEDOR', 'COMUNICADOR', 'ORGANIZADOR', 'CREATIVO'];
 
 // Cache para memoización de puntajes
 let cache = { lastLen: -1, scores: {}, counts: {}, normalized: {} };
