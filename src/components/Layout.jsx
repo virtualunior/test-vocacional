@@ -10,9 +10,7 @@ export default function Layout({ children, title }) {
           <div className="flex justify-between items-center h-16">
             {/* Logo/Brand Area */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#db1f26] to-[#660915] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">UNIOR</span>
-              </div>
+              <img src="unior-icon.webp" alt="Unior Icon" class="w-8 h-8 rounded-lg"/>
               <div className="hidden sm:block">
                 <h2 className="text-sm font-medium text-gray-900">Universidad Privada de Oruro</h2>
                 <p className="text-xs text-gray-500">Sistema de Orientación Vocacional</p>

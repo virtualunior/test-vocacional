@@ -10,7 +10,7 @@ import {
 import { doc, setDoc, getDoc } from "firebase/firestore"
 import { useNavigate } from "react-router-dom"
 import { signInWithGoogle } from "../firebase" // Import signInWithGoogle from firebase.js
-import { FaGoogle, FaEnvelope, FaLock, FaUser, FaCalendarAlt, FaExclamationCircle } from "react-icons/fa"
+import { FaGoogle, FaEnvelope, FaLock, FaUser, FaCalendarAlt, FaExclamationCircle, FaPhone  } from "react-icons/fa"
 
 export default function Auth({ onUser }) {
   const [isRegister, setIsRegister] = useState(false)
@@ -24,6 +24,7 @@ export default function Auth({ onUser }) {
   const [needsAdditionalInfo, setNeedsAdditionalInfo] = useState(false)
   const [googleUser, setGoogleUser] = useState(null)
   const navigate = useNavigate()
+  const [phone, setPhone] = useState("") // Agrega esto con los otros estados
 
   // Generate birth year options (for users between 14 and 70 years old)
   const currentYear = new Date().getFullYear()
@@ -33,43 +34,53 @@ export default function Auth({ onUser }) {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log("Auth state changed:", user ? user.email : "No user")
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    console.log("Auth state changed:", user ? user.email : "No user");
 
-      if (user) {
-        // Check if we need to collect additional info for this user
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid))
+    if (user) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
 
-          if (!userDoc.exists() || !userDoc.data().birthYear) {
-            // User exists but doesn't have birthYear - need additional info
-            console.log("User needs additional info")
-            setGoogleUser(user)
-            setNeedsAdditionalInfo(true)
-          } else {
-            // User has complete profile
-            console.log("User has complete profile")
-            setNeedsAdditionalInfo(false)
-            onUser(user)
-          }
-        } catch (err) {
-          console.error("Error checking user data:", err)
-          // If there's an error, we'll assume we need additional info
+        if (!userDoc.exists() || !userDoc.data().birthYear) {
+          console.log("User needs additional info. Setting needsAdditionalInfo to true.");
+          setNeedsAdditionalInfo(true);
           if (user.providerData[0].providerId === "google.com") {
-            setGoogleUser(user)
-            setNeedsAdditionalInfo(true)
-          } else {
-            onUser(user)
+            setGoogleUser(user);
+          }
+        } else {
+          console.log("User has complete profile. Setting needsAdditionalInfo to false.");
+          setNeedsAdditionalInfo(false);
+          onUser(user);
+          if (window.location.pathname === "/auth" || window.location.pathname === "/") {
+            navigate("/dashboard");
           }
         }
-      } else {
-        // No user is signed in
-        onUser(null)
+      } catch (err) {
+        console.error("Error checking user data in useEffect:", err);
+        if (user.providerData[0].providerId === "google.com") {
+          console.log("Error fetching user doc, assuming Google user needs additional info.");
+          setGoogleUser(user);
+          setNeedsAdditionalInfo(true);
+        } else {
+          onUser(user);
+        }
       }
-    })
+    } else {
+      // No user is signed in
+      console.log("No user detected, redirecting to auth");
+      onUser(null);
+      setNeedsAdditionalInfo(false);
+      setGoogleUser(null);
+      
+      // AGREGAR ESTA NAVEGACIÓN
+      if (window.location.pathname !== "/auth") {
+        navigate("/auth", { replace: true });
+      }
+    }
+  });
 
-    return unsubscribe
-  }, [onUser])
+  return unsubscribe;
+}, [onUser, navigate]);
 
   const validateForm = () => {
     if (isRegister) {
@@ -140,63 +151,87 @@ export default function Auth({ onUser }) {
     }
   }
 
+ 
   const handleGoogleLogin = async () => {
-    setError("") // Clear previous errors
-    setLoading(true)
+    setError("");
+    setLoading(true);
     try {
-      // Call the exported function to sign in with Google
-      const result = await signInWithGoogle()
-      console.log("Google login successful, checking if user needs additional info")
-
-      // The user is now logged in, but we'll check if they need to provide birth year
-      // This will be handled by the useEffect with onAuthStateChanged
+      const result = await signInWithGoogle();
+      const user = result.user;
+      
+      // Verificar si el usuario ya existe en Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      
+      if (!userDoc.exists()) {
+        // Si no existe, preparar para pedir información adicional
+        setGoogleUser(user);
+        setNeedsAdditionalInfo(true);
+      }
+      // Si existe, el listener onAuthStateChanged manejará la navegación
     } catch (err) {
-      console.error("Google login error:", err)
-      setError("Error al iniciar sesión con Google. Intenta nuevamente.")
-      setLoading(false)
+      console.error("Google login error:", err);
+      setError("Error al iniciar sesión con Google. Intenta nuevamente.");
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   const handleAdditionalInfoSubmit = async (e) => {
-    e.preventDefault()
-    setError("")
-
+    e.preventDefault();
+    setError("");
+  
+    // Validación del año de nacimiento
     if (!birthYear) {
-      setError("Por favor selecciona tu año de nacimiento")
-      return
+      setError("Por favor selecciona tu año de nacimiento");
+      return;
     }
-
-    setLoading(true)
+  
+    // Validación opcional del teléfono (si se ingresó)
+    if (phone && !/^[0-9]{7,15}$/.test(phone)) {
+      setError("Por favor ingresa un número de teléfono válido (solo números, 7-15 dígitos)");
+      return;
+    }
+  
+    setLoading(true);
     try {
-      const user = auth.currentUser
+      const user = auth.currentUser;
+      
       if (!user) {
-        throw new Error("No hay usuario autenticado")
+        throw new Error("No hay usuario autenticado");
       }
-
-      // Store additional user data in Firestore
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          name: user.displayName || "",
-          email: user.email,
-          birthYear: Number.parseInt(birthYear),
-          registrationDate: new Date(),
-          photoURL: user.photoURL || null,
-        },
-        { merge: true },
-      ) // Use merge to avoid overwriting existing data
-
-      // Continue with normal flow
-      setNeedsAdditionalInfo(false)
-      onUser(user)
-      navigate("/test")
+  
+      // Crear el objeto con los datos a guardar
+      const userData = {
+        uid: user.uid,
+        name: user.displayName || "",
+        email: user.email,
+        birthYear: Number(birthYear),
+        phone: phone || null,
+        photoURL: user.photoURL || null,
+        provider: "google.com",
+        createdAt: new Date(),
+        lastLogin: new Date(),
+        updatedAt: new Date()
+      };
+  
+      console.log("Intentando guardar:", userData); // Para depuración
+  
+      // Guardar en Firestore
+      await setDoc(doc(db, "users", user.uid), userData, { merge: true });
+  
+      console.log("Datos guardados exitosamente"); // Para depuración
+      
+      // Redirigir y actualizar estado
+      setNeedsAdditionalInfo(false);
+      onUser(user);
+      navigate("/dashboard");
     } catch (err) {
-      console.error("Error saving additional info:", err)
-      setError("Error al guardar información. Intenta nuevamente.")
+      console.error("Error detallado:", err); // Más detalles del error
+      setError(`Error al guardar: ${err.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // If we need to collect additional information after Google login
   if (needsAdditionalInfo && auth.currentUser) {
@@ -247,6 +282,25 @@ export default function Auth({ onUser }) {
                 </select>
               </div>
             </div>
+            {/* Nuevo campo para teléfono */}
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                Teléfono (opcional)
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaPhone className="text-gray-400" />
+                </div>
+                <input
+                  id="phone"
+                  type="tel"
+                  placeholder="Ingresa tu número de teléfono"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-[#db1f26] focus:border-[#db1f26] bg-white text-gray-900"
+                />
+              </div>
+            </div>
 
             <button
               type="submit"
@@ -267,9 +321,7 @@ export default function Auth({ onUser }) {
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#db1f26] to-[#660915] rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">UPO</span>
-            </div>
+            <img src="unior-icon.webp" alt="Unior Icon" class="w-16 h-16 rounded-lg"/>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Universidad Privada de Oruro</h1>
           <p className="text-gray-600 mt-2">Sistema de Orientación Vocacional</p>
@@ -422,6 +474,7 @@ export default function Auth({ onUser }) {
 
           {/* Google Sign-In Button */}
           <button
+            type="button"
             onClick={handleGoogleLogin}
             disabled={loading}
             className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#db1f26] transition-colors"
