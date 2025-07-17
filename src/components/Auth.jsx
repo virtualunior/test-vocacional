@@ -11,8 +11,9 @@ import { doc, setDoc, getDoc } from "firebase/firestore"
 import { useNavigate } from "react-router-dom"
 import { signInWithGoogle } from "../firebase" // Import signInWithGoogle from firebase.js
 import { FaGoogle, FaEnvelope, FaLock, FaUser, FaCalendarAlt, FaExclamationCircle, FaPhone  } from "react-icons/fa"
+import { useAuth } from "../context/AuthContext"
 
-export default function Auth({ onUser }) {
+export default function Auth() {
   const [isRegister, setIsRegister] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -21,9 +22,8 @@ export default function Auth({ onUser }) {
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [needsAdditionalInfo, setNeedsAdditionalInfo] = useState(false)
-  const [googleUser, setGoogleUser] = useState(null)
   const navigate = useNavigate()
+  const { setUser, needsAdditionalInfo, setNeedsAdditionalInfo, setGoogleUser } = useAuth()
   const [phone, setPhone] = useState("") // Agrega esto con los otros estados
 
   // Generate birth year options (for users between 14 and 70 years old)
@@ -50,7 +50,7 @@ export default function Auth({ onUser }) {
         } else {
           console.log("User has complete profile. Setting needsAdditionalInfo to false.");
           setNeedsAdditionalInfo(false);
-          onUser(user);
+          setUser(user);
           if (window.location.pathname === "/auth" || window.location.pathname === "/") {
             navigate("/dashboard");
           }
@@ -62,13 +62,13 @@ export default function Auth({ onUser }) {
           setGoogleUser(user);
           setNeedsAdditionalInfo(true);
         } else {
-          onUser(user);
+          setUser(user);
         }
       }
     } else {
       // No user is signed in
       console.log("No user detected, redirecting to auth");
-      onUser(null);
+      setUser(null);
       setNeedsAdditionalInfo(false);
       setGoogleUser(null);
       
@@ -80,7 +80,7 @@ export default function Auth({ onUser }) {
   });
 
   return unsubscribe;
-}, [onUser, navigate]);
+}, [setUser, setNeedsAdditionalInfo, setGoogleUser, navigate]);
 
   const validateForm = () => {
     if (isRegister) {
@@ -223,7 +223,7 @@ export default function Auth({ onUser }) {
       
       // Redirigir y actualizar estado
       setNeedsAdditionalInfo(false);
-      onUser(user);
+      setUser(user);
       navigate("/dashboard");
     } catch (err) {
       console.error("Error detallado:", err); // Más detalles del error
