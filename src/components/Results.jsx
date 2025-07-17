@@ -10,6 +10,7 @@ import {
     ResponsiveContainer
 } from 'recharts';
 import { careerProfiles } from '../services/careerProfiles'; // Importa los perfiles de carrera
+import { matchCareersEuclidean } from '../services/algorithm';
 
 export default function Results({ answers }) {
     // Definir las categorías principales tal como están en questions.js y algorithm.js
@@ -69,45 +70,8 @@ export default function Results({ answers }) {
     // Ordenar los datos para la gráfica de mayor a menor afinidad
     chartData.sort((a, b) => b.score - a.score);
 
-
-    // 2. Lógica para Sugerir Carreras
-    const suggestedCareers = [];
-    const careerAffinities = {}; // Para guardar la afinidad calculada para cada carrera
-
-    Object.keys(careerProfiles).forEach(careerName => {
-        const profile = careerProfiles[careerName];
-        let affinityScore = 0;
-        let totalIdealWeight = 0;
-
-        // Calcular la afinidad de la carrera con el perfil del estudiante
-        CATEGORIES.forEach(cat => {
-            const studentScore = normalizedScores[cat]; // Puntaje normalizado del estudiante para la categoría
-            const idealWeight = profile.idealProfile[cat] || 0; // Peso ideal de la categoría para la carrera
-
-            affinityScore += studentScore * idealWeight; // Multiplica la afinidad del estudiante por la importancia de la categoría para la carrera
-            totalIdealWeight += idealWeight;
-        });
-
-        // Normalizar la afinidad total de la carrera
-        // Esto evita que carreras con más categorías importantes tengan una ventaja injusta
-        careerAffinities[careerName] = totalIdealWeight > 0 ? affinityScore / totalIdealWeight : 0;
-    });
-
-    // Ordenar las carreras por el puntaje de afinidad de mayor a menor
-    const sortedCareers = Object.entries(careerAffinities)
-        .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
-        .filter(([, score]) => score > 0.3); // Filtrar solo las carreras con afinidad significativa
-
-    // Seleccionar las top 3 o 4 carreras sugeridas
-    sortedCareers.slice(0, 3).forEach(([careerName, score]) => {
-        if (score > 0) { // Solo añadir si hay alguna afinidad
-            suggestedCareers.push({
-                name: careerName,
-                score: Math.round(score * 100), // Convertir a porcentaje
-                profile: careerProfiles[careerName]
-            });
-        }
-    });
+    // 2. Matching de carreras por distancia euclidiana (nuevo)
+    const topCareers = matchCareersEuclidean(normalizedScores);
 
     // Define tus colores para Recharts
     const primaryColor = '#db1f26'; // Tu rojo/granate principal
@@ -172,39 +136,61 @@ export default function Results({ answers }) {
                 </div>
             </div>
 
-            {/* Sección de Sugerencias de Carrera */}
+            {/* Sección de Sugerencias de Carrera (Top 3 con comparación visual) */}
             <div className="bg-white bg-opacity-5 p-4 rounded-lg shadow-inner">
-                <h3 className="text-xl md:text-2xl font-semibold text-center mb-4 text-yellow-400">Carreras Sugeridas para Ti</h3>
-                {suggestedCareers.length === 0 ? (
+                <h3 className="text-xl md:text-2xl font-semibold text-center mb-4 text-yellow-400">Top 3 Carreras Sugeridas para Ti</h3>
+                {topCareers.length === 0 ? (
                     <p className="text-center text-gray-300">
                         No hemos encontrado afinidades claras con las carreras disponibles. ¡Sigue explorando tus intereses!
                     </p>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {suggestedCareers.map((career, index) => (
-                            <div key={index} className="bg-gray-800 p-5 rounded-lg shadow-md border border-gray-700">
-                                <h4 className="text-xl font-bold text-blue-300 mb-2">{career.name}</h4>
-                                <p className="text-sm text-gray-400 mb-3">
-                                    Afinidad: <span className="font-semibold text-blue-200">{career.score}%</span>
-                                </p>
-                                <p className="text-gray-300 text-sm mb-3">
-                                    {career.profile.description}
-                                </p>
-                                <p className="text-xs text-gray-500 italic mb-2">
-                                    Palabras clave: {career.profile.keywords.join(', ')}.
-                                </p>
-                                <div className="mt-auto"> {/* Ensures motivations are at bottom */}
-                                    {career.profile.motivations.map((m, i) => (
-                                        <p key={i} className="text-sm text-green-300 mb-1">
-                                            🌟 {m}
-                                        </p>
-                                    ))}
+                        {topCareers.map((careerObj, index) => {
+                            const { career, distance, profile } = careerObj;
+                            // Preparar datos para comparar visualmente el perfil del usuario vs el ideal
+                            const compareData = CATEGORIES.map(cat => ({
+                                category: cat,
+                                "Tu perfil": Math.round((normalizedScores[cat] || 0) * 100),
+                                "Perfil ideal": Math.round((profile.idealProfile[cat] || 0) * 100)
+                            }));
+                            return (
+                                <div key={index} className="bg-gray-800 p-5 rounded-lg shadow-md border border-gray-700 flex flex-col">
+                                    <h4 className="text-xl font-bold text-blue-300 mb-2">{career}</h4>
+                                    <p className="text-sm text-gray-400 mb-3">
+                                        Cercanía: <span className="font-semibold text-blue-200">{distance.toFixed(2)}</span> (menor es mejor)
+                                    </p>
+                                    <p className="text-gray-300 text-sm mb-3">
+                                        {profile.description}
+                                    </p>
+                                    <p className="text-xs text-gray-500 italic mb-2">
+                                        Palabras clave: {profile.keywords.join(', ')}.
+                                    </p>
+                                    {/* Comparación visual */}
+                                    <div className="mb-3">
+                                        <ResponsiveContainer width="100%" height={120}>
+                                            <BarChart data={compareData} layout="vertical" margin={{ left: 20, right: 20, top: 10, bottom: 10 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke={gridLineColor} opacity={0.3} />
+                                                <XAxis type="number" domain={[0, 100]} hide />
+                                                <YAxis dataKey="category" type="category" width={80} tick={{ fill: axisTextColor, fontSize: 11 }} />
+                                                <Tooltip formatter={(value, name) => [`${value}%`, name]} />
+                                                <Bar dataKey="Tu perfil" fill={highlightColor} barSize={12} />
+                                                <Bar dataKey="Perfil ideal" fill={secondaryColor} barSize={12} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="mt-auto">
+                                        {profile.motivations.map((m, i) => (
+                                            <p key={i} className="text-sm text-green-300 mb-1">
+                                                🌟 {m}
+                                            </p>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
-                 <p className="text-center text-gray-400 text-sm mt-6">
+                <p className="text-center text-gray-400 text-sm mt-6">
                     Recuerda que este test es una guía. ¡Tu pasión y esfuerzo son la clave de tu éxito! Explora más a fondo las carreras que te interesen.
                 </p>
             </div>

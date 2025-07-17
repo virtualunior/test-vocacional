@@ -2,9 +2,10 @@
 // Algoritmo adaptativo de test vocacional sin TensorFlow
 
 import { questions } from './questions';
+import { careerProfiles } from './careerProfiles';
 
 // Configuración del test
-export const MAX_QUESTIONS = 40;
+export const MAX_QUESTIONS = 30;
 const EXPLORATION_PHASE_LENGTH = 15;       // 3 preguntas por categoría (5×3)
 export const CATEGORIES = ['EXPLORADOR', 'HACEDOR', 'COMUNICADOR', 'ORGANIZADOR', 'CREATIVO'];
 
@@ -78,7 +79,29 @@ function selectQuestion(candidates, mode) {
 }
 
 /**
- * Devuelve la siguiente pregunta adaptativa.
+ * Calcula la distancia euclidiana entre el perfil del usuario y el perfil ideal de cada carrera.
+ * Retorna el top 3 de carreras más cercanas.
+ */
+export function matchCareersEuclidean(normalizedScores) {
+  // normalizedScores: { EXPLORADOR: 0.7, HACEDOR: 0.2, ... }
+  const results = Object.entries(careerProfiles).map(([career, data]) => {
+    const ideal = data.idealProfile;
+    // Distancia euclidiana
+    const distance = Math.sqrt(
+      Object.keys(ideal).reduce(
+        (sum, cat) => sum + Math.pow((normalizedScores[cat] || 0) - ideal[cat], 2),
+        0
+      )
+    );
+    return { career, distance, profile: data };
+  });
+  // Ordenar por menor distancia
+  results.sort((a, b) => a.distance - b.distance);
+  return results.slice(0, 3); // Top 3 carreras
+}
+
+/**
+ * Devuelve la siguiente pregunta adaptativa (mejorada: alterna entre las dos categorías más altas).
  */
 export function getNextQuestion(currentAnswers = []) {
   const askedIds = new Set(currentAnswers.map(a => a.id));
@@ -93,10 +116,13 @@ export function getNextQuestion(currentAnswers = []) {
     if (cand.length) return selectQuestion(cand, 'random');
   }
 
-  // 2) Fase adaptativa
+  // 2) Fase adaptativa mejorada: alternar entre las dos categorías más altas
   const { scores, counts, normalized } = calculateScores(currentAnswers);
-  const dom = getDominantCategory(scores, normalized, counts);
-  let cand = remaining.filter(q => q.category === dom);
+  const sortedCats = Object.entries(normalized)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat]) => cat);
+  const top2 = sortedCats.slice(0, 2);
+  let cand = remaining.filter(q => top2.includes(q.category));
   if (cand.length) return selectQuestion(cand, 'weighted');
 
   // 3) Fallback global
