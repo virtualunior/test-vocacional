@@ -14,9 +14,6 @@ export default function AdminDashboard() {
         <nav className="mb-8">
           <ul className="flex gap-6 text-lg text-blue-700">
             <li>
-              <button className={section === 'estadisticas' ? 'font-semibold' : 'text-gray-400'} onClick={() => setSection('estadisticas')}>Estadísticas</button>
-            </li>
-            <li>
               <button className={section === 'estudiantes' ? 'font-semibold' : 'text-gray-400'} onClick={() => setSection('estudiantes')}>Estudiantes</button>
             </li>
             <li>
