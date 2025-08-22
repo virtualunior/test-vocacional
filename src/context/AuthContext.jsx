@@ -6,6 +6,8 @@ import { auth, db } from '../firebase'; // Corregir la importación
 
 const AuthContext = createContext();
 
+// Eliminar la lista ADMIN_EMAILS
+
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true); // Para manejar el estado inicial de carga
@@ -13,32 +15,41 @@ export const AuthProvider = ({ children }) => {
     const [googleUser, setGoogleUser] = useState(null); // Si necesitas esto
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            console.log("Auth state changed (AuthContext):", currentUser ? currentUser.email : "No user");
-            if (currentUser) {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            console.log("Auth state changed (AuthContext):", user ? user.email : "No user");
+            if (user) {
                 try {
-                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-                    if (!userDoc.exists() || !userDoc.data().birthYear) {
+                    // Obtener el documento del usuario en Firestore
+                    const userDocRef = doc(db, 'users', user.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+                    let role = 'user';
+                    if (userDocSnap.exists() && userDocSnap.data().role) {
+                        role = userDocSnap.data().role;
+                    }
+                    setUser({ ...user, role });
+
+                    if (!userDocSnap.exists() || !userDocSnap.data().birthYear) {
                         console.log("User needs additional info. Setting needsAdditionalInfo to true (AuthContext).");
                         setNeedsAdditionalInfo(true);
-                        if (currentUser.providerData[0].providerId === "google.com") {
-                            setGoogleUser(currentUser);
+                        if (user.providerData[0].providerId === "google.com") {
+                            setGoogleUser(user);
                         }
                     } else {
                         console.log("User has complete profile. Setting needsAdditionalInfo to false (AuthContext).");
                         setNeedsAdditionalInfo(false);
-                        setUser(currentUser); // Solo setea el usuario si el perfil está completo
+                        // Determinar si es admin
+                        // Eliminar la lista ADMIN_EMAILS
                         setGoogleUser(null);
                     }
                 } catch (err) {
                     console.error("Error checking user data in AuthContext useEffect:", err);
-                    if (currentUser.providerData[0].providerId === "google.com") {
+                    if (user.providerData[0].providerId === "google.com") {
                         console.log("Error fetching user doc, assuming Google user needs additional info (AuthContext).");
-                        setGoogleUser(currentUser);
+                        setGoogleUser(user);
                         setNeedsAdditionalInfo(true);
-                        setUser(currentUser); // Si hay error, asumimos que al menos el usuario existe y lo seteamos
+                        setUser(user); // Si hay error, asumimos que al menos el usuario existe y lo seteamos
                     } else {
-                        setUser(currentUser);
+                        setUser(user);
                     }
                 }
             } else {

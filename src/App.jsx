@@ -5,6 +5,8 @@ import Auth from './components/Auth';
 import Dashboard from './pages/Dashboard';
 import Test from './pages/Test';
 import TestDetail from './pages/TestDetail';
+import AdminRoute from './components/AdminRoute';
+import AdminDashboard from './components/admin/AdminDashboard';
 
 export default function App() {
   const { user, loading, needsAdditionalInfo } = useAuth();
@@ -37,6 +39,11 @@ export default function App() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/dashboard/:id" element={<TestDetail />} />
       <Route path="/test" element={<Test />} />
+      <Route path="/admin/*" element={
+        <AdminRoute>
+          <AdminDashboard />
+        </AdminRoute>
+      } />
       {/* Redirigir a /dashboard por defecto */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
